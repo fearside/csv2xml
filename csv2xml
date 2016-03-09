@@ -1,0 +1,214 @@
+#!/usr/bin/env python
+import sys
+import os
+import glob
+import re
+import time
+import resource
+
+# Set start time
+tic = time.clock()
+
+__status__ = "Development" # Statuses that is allowed is Prototype, Development & Production
+__author__ = "Teddy Skarin"
+__function__ = "Converts a CSV file to simple XML structured file."
+__copyright__ = "XYZ"
+__credits__ = ["T1", "T2", "T3", "T4"]
+__license__ = "GPL"
+__version__ = "0.5d" # Version statuses are X.X followed by an p(prototype),d(development) or P(Production) marker
+__maintainer__ = "Teddy Skarin"
+__email__ = "teddy.skarin@gmail.com"
+__script__ = os.path.basename(sys.argv[0])
+
+# Variables
+input = ""
+output = ""
+emptyElement = ""
+progress = ""
+delimiter = ""
+progressbar = ""
+storeChange = 0.0
+progressBarUpdateRate = 1
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+
+def printInfo():
+    print bcolors.HEADER + '=> Script   : ' + __script__ + bcolors.ENDC
+    print bcolors.HEADER + '=> Function : ' + __function__ + bcolors.ENDC
+    print bcolors.HEADER + '=> Author   : ' + __author__ + bcolors.ENDC
+    print bcolors.HEADER + '=> Status   : ' + __status__ + bcolors.ENDC
+    print bcolors.HEADER + '=> Version  : ' + __version__ + bcolors.ENDC
+# Unused atm.
+#def ProgressSpinner():
+#    sys.stdout.write(spinner.next())
+#    sys.stdout.flush()
+#    sys.stdout.write('\b')
+
+def printFinish():
+    print bcolors.OKGREEN + '+ Processing finished' + bcolors.ENDC
+    rowsPerSecond = row_count / round(toc,2)
+    xmlData = open(xmlFile, 'r')
+    xmlRowsCount =  sum(1 for row in xmlData)
+    xmlData.close()
+    xmlRowsPerSecond = xmlRowsCount / round(toc,2)
+    print(bcolors.OKGREEN + '+ Time used, ' + str(round(toc,2)) + ' seconds(' + str(round(rowsPerSecond,2)) + ' reads/sec, ' + str(round(xmlRowsPerSecond,2)) + ' writes/sec)' + bcolors.ENDC)
+    memUsage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    memCalc = memUsage / 1024 / 1024
+    print bcolors.OKGREEN + '+ Memory used, ' + str(round(memCalc,2))+ 'Mb' + bcolors.ENDC
+    xmlFileSize = round((os.path.getsize(xmlFile) / 1024 / 1024),2)
+    print bcolors.OKGREEN + '+ Bytes written, ' + str(xmlFileSize) + 'Mb' + bcolors.ENDC
+
+def update_progress(progressbar):
+    barLength = 40 # Modify this to change the length of the progress bar
+    status = ""
+    block = int(round(barLength*progressbar))
+    text = bcolors.OKGREEN + "\rProgress: [{0}] {1}% {2}".format( "#"*block + "-"*(barLength-block), round(progressbar*100,1), status) + bcolors.ENDC
+    sys.stdout.write(text)
+    sys.stdout.flush()
+
+def writeXmlHeader():
+    # Write XML header and info
+    xmlData.write('<?xml version="1.0"?>' + "\n")
+    xmlData.write('<!-- Generated with ' + __script__ + ' ' + __version__ + ' --!>\n')
+    xmlData.write('<!-- Application developed by ' + __author__ + ', Copyright ' + __copyright__ + ' --!>\n')
+
+printInfo()
+
+for arg in sys.argv[1:]:
+    # Start matching inputargs
+    if re.match('if\=.*', arg):
+        if not input:
+            input = arg[3:]
+
+    if re.match('of\=.*', arg):
+        if not output:
+            output = arg[3:]
+
+    if re.match('emptyelement\=.*', arg):
+        if not emptyElement and arg[13:] == "true":
+            emptyElement = arg[13:]
+
+    if re.match('progress\=.*', arg):
+        if not progress and arg[9:] == "true":
+            progress = arg[9:]
+
+    if re.match('progressbar\=.*', arg):
+        if not progressbar and arg[12:] == "true":
+            progressbar = arg[12:]
+
+    if re.match('delimiter\=.*', arg):
+        if not delimiter:
+            delimiter = arg[10:]
+
+#os._exit(0)
+
+if not emptyElement:
+    emptyElement = "false"
+    print bcolors.WARNING + '+ Omitting empty elements' + bcolors.ENDC
+else:
+    print bcolors.WARNING + '+ Keeping empty elements, please note that this might consume alot of diskspace.' + bcolors.ENDC
+
+if progress:
+    print bcolors.WARNING + '+ Warning! Progress indicator activated, this might flood your screen/log!' + bcolors.ENDC
+else:
+    progress = "false"
+
+if progressbar:
+    print bcolors.WARNING + '+ Progressbar turned on, this might consume more time.'
+else:
+    progressbar = "false"
+
+if not delimiter:
+    delimiter = ";"
+    print bcolors.WARNING + '+ Delimiter set to default ["' + bcolors.OKGREEN + delimiter + bcolors.WARNING + '"]' + bcolors.ENDC
+else:
+    print bcolors.WARNING + '+ Delimiter set to ["' + bcolors.OKGREEN + delimiter + bcolors.WARNING + '"]'+ bcolors.ENDC
+
+#os._exit(0)
+
+rowCount = 0
+csvFiles = input
+xmlFile = output
+
+csvFile = open(csvFiles, 'rb')
+csvData = csvFile.readlines()
+row_count = sum(1 for row in csvData)
+row_count = row_count - 1
+csvFile.close()
+
+#os._exit(0)
+
+tags = csvData.pop(0).strip().replace(' ', '_').split(delimiter)
+xmlData = open(xmlFile, 'w')
+
+if progressbar and progressbar == "false":
+    print bcolors.OKGREEN + '+ Processing started...' + bcolors.ENDC
+
+writeXmlHeader()
+
+# Open up a rootlevel element with the filename itself
+xmlData.write('<' + xmlFile + '>' + "\n")
+
+if progressbar == "true":
+    update_progress(storeChange)
+
+# Main script - Loop through rows in the CSV file
+for row in csvData:
+    rowCount += 1
+    rowData = row.strip().split(delimiter)
+    # Open up an xml element and add the item/row number
+    xmlData.write('\t<csvrow' + ' number="' + str(rowCount) +'">' + "\n")
+
+    # Loop through all the columns in the csv row
+    for i in range(len(tags)):
+
+        # Check if datafield is empty, if empty put out an empty element
+        if emptyElement == 'true':
+            if not rowData[i]:
+                xmlData.write('\t\t' + '<' + tags[i] + '/>' + "\n")
+                if progress and progress == "true":
+                    sys.stdout.write(bcolors.WARNING + 'E' + bcolors.ENDC)
+            else:
+                xmlData.write('\t\t' + '<' + tags[i] + '>' + rowData[i] + '</' + tags[i] + '>' + "\n")
+                if progress and progress == "true":
+                    sys.stdout.write(bcolors.OKGREEN + '.' + bcolors.ENDC)
+        else:
+            # Check if a datafield is present, write only the present element
+            if rowData[i]:
+                # Open and close value element
+                xmlData.write('\t\t' + '<' + tags[i] + '>' + rowData[i] + '</' + tags[i] + '>' + "\n")
+                if progress and progress == "true":
+                    sys.stdout.write(bcolors.OKGREEN + '.' + bcolors.ENDC)
+                else:
+                    if progressbar and progressbar == "true":
+                        checkInteger = round(rowCount/float(row_count) * 100, progressBarUpdateRate)
+                        # Check if the new integer value is larger than the old
+                        # If so, update the progress bar and the new value.
+                        if checkInteger > storeChange:
+                            update_progress(rowCount/float(row_count))
+                            storeChange = round(rowCount/float(row_count) * 100, progressBarUpdateRate)
+
+    # Close the item element
+    xmlData.write('\t</csvrow>' + "\n")
+
+# Close root element
+xmlData.write('</' + xmlFile + '>' + "\n")
+xmlData.close()
+
+# Set end time
+toc = time.clock()
+
+# Calculate processing time
+toc - tic
+
+if progressbar and progressbar == "true":
+    print '' + bcolors.ENDC
+
+# Print finishing message
+printFinish()
