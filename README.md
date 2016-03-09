@@ -1,3 +1,3 @@
 1. Information
-Discontinued.
+Old code imported as-is. Use with care.
 
